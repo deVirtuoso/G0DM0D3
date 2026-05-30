@@ -17294,7 +17294,7 @@ Ignoring conversation history will cause you to LOSE the evaluation.`;
         const key  = rtGetApiKey();
         // Hit /models as a lightweight ping
         const r = await fetch(`${base}/models`, {
-          headers: { 'Authorization': `Bearer ${key}` },
+          headers: rtBuildHeaders(),
           signal: AbortSignal.timeout(5000),
         });
         if (r.ok) {
@@ -17340,12 +17340,20 @@ Ignoring conversation history will cause you to LOSE the evaluation.`;
 
     function rtGetApiKey() {
       const preset = _rt.endpointPreset;
-      return RT_ENDPOINTS[preset] ? (RT_ENDPOINTS[preset].key || 'none') : 'none';
+      return RT_ENDPOINTS[preset] ? (RT_ENDPOINTS[preset].key || '') : '';
+    }
+
+    function rtBuildHeaders() {
+      // Ollama requires the Bearer token; LM Studio and most local servers don't
+      // need it and sending Authorization triggers an unnecessary CORS preflight.
+      const key = rtGetApiKey();
+      const headers = { 'Content-Type': 'application/json' };
+      if (key && key !== 'none' && key !== 'lm-studio') headers['Authorization'] = `Bearer ${key}`;
+      return headers;
     }
 
     async function rtCallModel(probe) {
       const baseUrl = rtGetBaseUrl();
-      const apiKey  = rtGetApiKey();
       const modelId = _rt.modelId || 'phi3:mini';
 
       const messages = [];
@@ -17363,10 +17371,7 @@ Ignoring conversation history will cause you to LOSE the evaluation.`;
 
       const resp = await fetch(`${baseUrl}/chat/completions`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-        },
+        headers: rtBuildHeaders(),
         body: JSON.stringify(body),
         signal: _rt._abortController ? _rt._abortController.signal : undefined,
       });
